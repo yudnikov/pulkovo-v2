@@ -18,8 +18,9 @@ object MyApp extends App {
     List.fill(n)(randomVector(length)).filter(_.exists(_.isDefined)).distinct
   }
 
-  //val input: List[Vector[Option[String]]] = randomInput(20)
-  val input: List[Vector[Option[String]]] = Json.extract[List[Vector[Option[String]]]]("input2", MySerializer)
+  val input: List[Vector[Option[String]]] = randomInput(100)
+  Json.write[List[Vector[Option[String]]]](input, "output", MySerializer)
+  //val input: List[Vector[Option[String]]] = Json.extract[List[Vector[Option[String]]]]("input2", MySerializer)
 
   val mapped = input.distinct.map(row => row.toInt -> row)
   val grouped0 = mapped.groupBy(_._1).map(t => t._1 -> t._2.map(_._2))
