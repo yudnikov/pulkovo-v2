@@ -18,7 +18,8 @@ object MyApp extends App {
     List.fill(n)(randomVector(length)).filter(_.exists(_.isDefined)).distinct
   }
 
-  val input: List[Vector[Option[String]]] = randomInput(4)
+  //val input: List[Vector[Option[String]]] = randomInput(20)
+  val input: List[Vector[Option[String]]] = Json.extract[List[Vector[Option[String]]]]("input2", MySerializer)
 
   val mapped = input.distinct.map(row => row.toInt -> row)
   val grouped0 = mapped.groupBy(_._1).map(t => t._1 -> t._2.map(_._2))
@@ -48,7 +49,8 @@ object MyApp extends App {
       t._1 + t._2 == targetSum
     }
 
-    val newKeys = split._2.map(t => t._1 + t._2).distinct
+    val newKeys = split._2.map(t => t._1 + t._2).distinct.diff(keys)
+
     val allKeys = keys.union(newKeys).distinct
 
     if (prev == newKeys)
@@ -57,15 +59,13 @@ object MyApp extends App {
       solve(allKeys, solved.union(split._1).distinct, newKeys)
   }
 
-  println(input.mkString("\n"))
-
   val res = solve(keys0)
   //println(res)
 
   val complete = res._1
   val nonComplete = res._2
 
-  val nonCompleteGrouped = nonComplete.groupBy(t => t._1 + t._2)
+  val nonCompleteGrouped0 = nonComplete.groupBy(t => t._1 + t._2)
 
   val resolveSplit = complete.partition { t =>
     keys0.contains(t._1) && keys0.contains(t._2)
@@ -73,10 +73,6 @@ object MyApp extends App {
 
   val resolved = resolveSplit._1
   val nonResolved = resolveSplit._2
-
-  nonResolved.map {
-    case _ =>
-  }
 
   def join(a: Vector[Option[String]], b: Vector[Option[String]]): Vector[Option[String]] = {
     a zip b map { ab =>
@@ -92,20 +88,32 @@ object MyApp extends App {
   }
 
   def resolve(x: List[(Int, Int)]): List[Vector[Option[String]]] = {
-    println(s"resolving: $x")
-    x.flatMap {
-      case t if nonCompleteGrouped.contains(t._1) && nonCompleteGrouped.contains(t._2) =>
-        combine(resolve(nonCompleteGrouped(t._1)), resolve(nonCompleteGrouped(t._2)))
-      case t if nonCompleteGrouped.contains(t._1) && grouped0.contains(t._2) =>
-        combine(resolve(nonCompleteGrouped(t._1)), grouped0(t._2))
-      case t if nonCompleteGrouped.contains(t._2) && grouped0.contains(t._1) =>
-        combine(resolve(nonCompleteGrouped(t._2)), grouped0(t._1))
+    val res = x.par.flatMap {
+      case t if nonCompleteGrouped0.contains(t._1) && nonCompleteGrouped0.contains(t._2) =>
+        val a = resolve(nonCompleteGrouped0(t._1))
+        val b = resolve(nonCompleteGrouped0(t._2))
+        val res = combine(a, b)
+        res
+      case t if nonCompleteGrouped0.contains(t._1) && grouped0.contains(t._2) =>
+        val a = resolve(nonCompleteGrouped0(t._1))
+        val b = grouped0(t._2)
+        val res = combine(a, b)
+        res
+      case t if nonCompleteGrouped0.contains(t._2) && grouped0.contains(t._1) =>
+        val a = resolve(nonCompleteGrouped0(t._2))
+        val b = grouped0(t._1)
+        val res = combine(a, b)
+        res
       case t if grouped0.contains(t._1) && grouped0.contains(t._2) =>
-        combine(grouped0(t._1), grouped0(t._2))
+        val res = combine(grouped0(t._1), grouped0(t._2))
+        res
     }
+    /*println(s"resolving: $x \n" +
+      s"res = $res")*/
+    res.toList
   }
 
-  val out = resolve(complete)
+  val out = resolve(complete).filter(!_.exists(_.isEmpty))
 
   /*val iter = split._2.map {
     case t if map.contains(t._1) && grouped.contains(t._2) =>
@@ -131,8 +139,9 @@ object MyApp extends App {
   //v
   //al iter = split._2.map(t => if (keys0.contains(t._1)) keys0(t._1) else ))
   //val y = res._2.filter(t => keys0.contains(t._1) && keys0.contains(t._2))
-
+  println(input.mkString("\n"))
   println(out.length)
+  out.foreach(v => println(v.map(_.get).mkString("")))
 
   //println(y)
 
