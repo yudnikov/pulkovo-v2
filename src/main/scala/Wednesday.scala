@@ -4,7 +4,7 @@ import Implicits.IntToBoolVector
 import scala.annotation.tailrec
 import scala.collection.GenSeq
 import scala.collection.parallel.ParMap
-import scala.collection.parallel.ParSeq
+
 import scala.util.Random
 
 object Wednesday extends App {
@@ -124,12 +124,17 @@ object Wednesday extends App {
     List.fill(n)(randomVector(12)).filter(_.exists(_.isDefined)).distinct
   }
 
-  val input: Table = randomInput(100).par
+  val random = randomInput(10000).par
 
-  //val input: LVOS = Json.extract[LVOS]("input", MySerializer)
+  val input: Table = Json.extract[List[Vector[Option[String]]]]("input", MySerializer).par
 
-  println(input.mkString("\n"))
-  println(solve(input).length)
-  //println(solve(input).mkString("\n"))
+  val out = solve(random)
+
+  //println(input.mkString("\n"))
+  println(out.length)
+
+  Json.write[List[Vector[Option[String]]]](random.toList, "random", MySerializer)
+
+  Json.write[List[Vector[Option[String]]]](out.toList, "output", MySerializer)
 
 }
