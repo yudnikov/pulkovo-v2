@@ -111,7 +111,7 @@ object Wednesday extends App {
     val maybeSolutions = results.par.map(_.seq.sorted).map(_.filter(map.contains)).distinct
     val solutions = maybeSolutions.filter(_.sum == targetSum)
     println(s"${new Date()} solutions (${solutions.length}) resolved")
-    val out = solutions.flatMap { solution =>
+    val out = map.getOrElse(targetSum, Nil) union solutions.flatMap { solution =>
       solution.map(key => map(key)).reduceLeft(combine)
     }
     out
