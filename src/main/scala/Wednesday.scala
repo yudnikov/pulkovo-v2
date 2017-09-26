@@ -1,10 +1,12 @@
+import java.util.Date
+
 import Implicits.OptVectorToInt
 import Implicits.IntToBoolVector
 
 import scala.annotation.tailrec
 import scala.collection.GenSeq
 import scala.collection.parallel.ParMap
-
+import scala.collection.parallel.ParSeq
 import scala.util.Random
 
 object Wednesday extends App {
@@ -18,7 +20,6 @@ object Wednesday extends App {
     if (list.nonEmpty)
       getStairs(list.tail, (list.head -> list.tail) :: acc)
     else {
-      println(s"got stairs")
       acc
     }
   }
@@ -47,7 +48,7 @@ object Wednesday extends App {
     val targetSum = Math.pow(2, length).toInt - 1
     val map = input.par.groupBy(_.toInt)
 
-    def rec(keys: List[Int], prev: ParMap[Int, GenSeq[(Int, Int)]] = Map().par): Table = {
+    def rec(keys: List[Int], prev: ParMap[Int, GenSeq[(Int, Int)]] = Map().par): (ParSeq[(Int, Int)], ParMap[Int, GenSeq[(Int, Int)]]) = {
 
       val split = getStairs(keys).par.flatMap { stair =>
         stair._2.map { r =>
@@ -81,35 +82,39 @@ object Wednesday extends App {
       val newKeys = nonComplete.keys.toList.diff(keys).sorted
 
       if (nonComplete == prev) {
-
-        val keys0 = map.keys.toList.sorted
-
-        def resolve(list: GenSeq[(Int, Int)]): GenSeq[GenSeq[Int]] = {
-          list.collect {
-            case t if nonComplete.contains(t._1) && !keys0.contains(t._1) && nonComplete.contains(t._2) && !keys0.contains(t._2) =>
-              resolve(nonComplete(t._1)).flatten.union(resolve(nonComplete(t._2)).flatten).distinct
-            case t if nonComplete.contains(t._1) && !keys0.contains(t._1) && keys0.contains(t._2) =>
-              resolve(nonComplete(t._1)).flatten.union(List(t._2)).distinct
-            case t if nonComplete.contains(t._2) && !keys0.contains(t._2) && keys0.contains(t._1) =>
-              resolve(nonComplete(t._2)).flatten.union(List(t._1)).distinct
-            case t if keys0.contains(t._2) && keys0.contains(t._1) =>
-              List(t._1, t._2).distinct
-          }
-        }
-
-        val results = resolve(complete)
-        val maybeSolutions = results.map(_.seq.sorted).map(_.filter(map.contains)).distinct
-        val solutions = maybeSolutions.filter(_.sum == targetSum)
-        val out = solutions.par.flatMap { solution =>
-          solution.map(key => map(key)).reduceLeft(combine)
-        }
-        out
+        complete -> nonComplete
       } else {
-        println(s"+ iteration")
         rec(keys.union(newKeys), nonComplete)
       }
     }
-    rec(map.keys.toList.sorted)
+
+    val keys0 = map.keys.toList.sorted
+
+    val res = rec(keys0)
+    val complete = res._1
+    val nonComplete = res._2
+
+    def resolve(list: GenSeq[(Int, Int)]): GenSeq[GenSeq[Int]] = {
+      list.collect {
+        case t if nonComplete.contains(t._1) && !keys0.contains(t._1) && nonComplete.contains(t._2) && !keys0.contains(t._2) =>
+          resolve(nonComplete(t._1)).flatten.union(resolve(nonComplete(t._2)).flatten).distinct
+        case t if nonComplete.contains(t._1) && !keys0.contains(t._1) && keys0.contains(t._2) =>
+          resolve(nonComplete(t._1)).flatten.union(List(t._2)).distinct
+        case t if nonComplete.contains(t._2) && !keys0.contains(t._2) && keys0.contains(t._1) =>
+          resolve(nonComplete(t._2)).flatten.union(List(t._1)).distinct
+        case t if keys0.contains(t._2) && keys0.contains(t._1) =>
+          List(t._1, t._2).distinct
+      }
+    }
+
+    val results = resolve(complete)
+    val maybeSolutions = results.par.map(_.seq.sorted).map(_.filter(map.contains)).distinct
+    val solutions = maybeSolutions.filter(_.sum == targetSum)
+    println(s"${new Date()} solutions (${solutions.length}) resolved")
+    val out = solutions.flatMap { solution =>
+      solution.map(key => map(key)).reduceLeft(combine)
+    }
+    out
   }
 
   def randomInput(n: Int): Table = {
@@ -117,22 +122,21 @@ object Wednesday extends App {
     val r = new Random()
 
     def randomVector(length: Int): Row = {
-      Vector.fill(length)(if (r.nextInt(100) >= 50) Some(r.nextInt(1000).toString) else None)
+      Vector.fill(length)(if (r.nextInt(100) >= 50) Some(r.nextInt(10000).toString) else None)
     }
 
     List.fill(n)(randomVector(12)).filter(_.exists(_.isDefined)).distinct
   }
 
-  val random = randomInput(10000).par
-
+  val random = randomInput(100000).par.distinct
   val input: Table = Json.extract[List[Vector[Option[String]]]]("input", MySerializer).par
 
-  val out = solve(random)
+  println(s"${new Date()} statred solving")
+  val out = solve(input)
+  println(s"${new Date()} solved")
 
   //println(input.mkString("\n"))
   println(out.length)
-
-  Json.write[List[Vector[Option[String]]]](random.toList, "random", MySerializer)
 
   Json.write[List[Vector[Option[String]]]](out.toList, "output", MySerializer)
 
