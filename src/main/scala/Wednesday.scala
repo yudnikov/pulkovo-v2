@@ -109,7 +109,6 @@ object Wednesday extends App {
         rec(keys.union(newKeys), nonComplete)
       }
     }
-
     rec(map.keys.toList.sorted)
   }
 
